@@ -2,7 +2,7 @@
 
 1. sleep
 
-```
+```cpp
 #include "kernel/stat.h"
 #include "kernel/types.h"
 #include "user/user.h"
@@ -21,7 +21,7 @@ int main(int argc, char* argv[]) {
 
 2. pingpong
 
-```
+```cpp
 
 #include "kernel/stat.h"
 #include "kernel/types.h"
@@ -49,7 +49,7 @@ int main(int argc, char* argv[]) {
 
 3. primes
 
-```
+```cpp
 
 #include "kernel/stat.h"
 #include "kernel/types.h"
@@ -111,7 +111,7 @@ int main(int argc, char* argv[]) {
 
 4. find
 
-```
+```cpp
 
 #include "kernel/fs.h"
 #include "kernel/stat.h"
@@ -173,7 +173,7 @@ int main(int argc, char* argv[]) {
 
 5. xargs
 
-```
+```cpp
 
 #include "kernel/fs.h"
 #include "kernel/stat.h"
