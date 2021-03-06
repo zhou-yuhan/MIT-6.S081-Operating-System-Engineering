@@ -2,7 +2,7 @@
 
 1. trace
 
-- add attribute `mask` in `kernal/proc.h` 
+- add attribute `mask` in `kernel/proc.h` 
 ```cpp
 // Per-process state
 struct proc {
@@ -29,7 +29,7 @@ struct proc {
 };
 ``` 
 
-- add `sys_trace()` in `kernal/sysproc.c`
+- add `sys_trace()` in `kernel/sysproc.c`
 ```cpp
 uint64 sys_trace(void) {
   int mask;
@@ -40,7 +40,7 @@ uint64 sys_trace(void) {
 }
 ```
 
-- add array `sys_names` in `kernal/syscall.c` to index names of sys calls
+- add array `sys_names` in `kernel/syscall.c` to index names of sys calls
 ```c
 static char* sys_names[] = {
 [SYS_fork]    "fork",
@@ -68,7 +68,7 @@ static char* sys_names[] = {
 };
 ```
 
-- modify `syscall()` in `kernal/syscall.c` to print a message when a sys call returns 
+- modify `syscall()` in `kernel/syscall.c` to print a message when a sys call returns 
 ```cpp
 void
 syscall(void)
@@ -91,12 +91,12 @@ syscall(void)
 }
 ```
 
-- modify `fork()` in `kernal/proc.c` to copy `mask` attribute from parent to child process
+- modify `fork()` in `kernel/proc.c` to copy `mask` attribute from parent to child process
 - add sys call number for `sys_trace`
 
 2. sysinfo
 
-- add `freemem()` in `kernal/kalloc.c` to count free memory that cab be used by kernal
+- add `freemem()` in `kernel/kalloc.c` to count free memory that cab be used by kernel
 ```cpp
 uint64 freemem(void) {
   struct run* r;
@@ -109,7 +109,7 @@ uint64 freemem(void) {
 }
 ```
 
-- add `unused_proc()` in `kernal/proc.c` to count unused processes
+- add `unused_proc()` in `kernel/proc.c` to count unused processes
 ```cpp
 int unused_proc(void) {
   int num = 0;
@@ -122,7 +122,7 @@ int unused_proc(void) {
 }
 ```
 
-- add `sys_sysinfo()` in `kernal/sysproc.c` to implement syscall `sysinfo()`
+- add `sys_sysinfo()` in `kernel/sysproc.c` to implement syscall `sysinfo()`
 ```cpp
 uint64 sys_sysinfo(void) {
   uint64 addr;

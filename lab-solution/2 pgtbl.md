@@ -263,3 +263,128 @@ proc_pagetable(struct proc *p)
 ```
 
 - modify `kvmpa()`, change `kernel_pagetable` to `myproc()->kpagetable`
+
+3. simplify `copyin/copyinstr`
+
+- add `u2kvmcopy()` in `kernel/vm.c` to copy user address space to kernel address space via add PTEs in kernel page table
+```cpp
+void u2kvmcopy(pagetable_t upagetable, pagetable_t kpagetable, uint64 oldsz, uint64 newsz) {
+  pte_t *u_pte, *k_pte;
+  uint64 va, pa;
+
+  if(oldsz < newsz)
+    return;
+  oldsz = PGROUNDDOWN(oldsz);
+  for(va = oldsz; va < newsz; va += PGSIZE) {
+    if ((u_pte = walk(upagetable, va, 0)) == 0) {
+      panic("u2kvmcopy: va pte does not exit\n");
+    } 
+    if((k_pte = walk(kpagetable, va, 1)) == 0) {
+      panic("u2kvmcopy: creat kernel pte failed\n");
+    }
+    pa = PTE2PA(*u_pte);
+    uint64 flag = PTE_FLAGS(*u_pte) & (~PTE_U);
+    *k_pte = PA2PTE(pa) | flag;
+  }
+}
+```
+
+- modify `fork() exec() sbrk()` to copy user address space into kernel address space when user space changes
+```cpp
+// fork 
+  // increment reference counts on open file descriptors.
+  for(i = 0; i < NOFILE; i++)
+    if(p->ofile[i])
+      np->ofile[i] = filedup(p->ofile[i]);
+  np->cwd = idup(p->cwd);
+
+  // copy parent user pagetable to child kernel page table
+  u2kvmcopy(p->pagetable, np->kpagetable, 0, p->sz);
+
+  safestrcpy(np->name, p->name, sizeof(p->name));
+
+// exec
+  // Allocate two pages at the next page boundary.
+  // Use the second as the user stack.
+  sz = PGROUNDUP(sz);
+  uint64 sz1;
+  if((sz1 = uvmalloc(pagetable, sz, sz + 2*PGSIZE)) == 0)
+    goto bad;
+  sz = sz1;
+  uvmclear(pagetable, sz-2*PGSIZE);
+  sp = sz;
+  stackbase = sp - PGSIZE;
+
+  u2kvmcopy(pagetable, p->kpagetable, 0, sz);
+
+// growproc (sbrk)
+// Grow or shrink user memory by n bytes.
+// Return 0 on success, -1 on failure.
+int
+growproc(int n)
+{
+  uint sz;
+  struct proc *p = myproc();
+
+  sz = p->sz;
+  if(n > 0){
+    // user address range can not overlap kernel address range, the size of user space must be less than PLIC 
+    if(sz + n > PLIC) 
+      return -1;
+    if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
+      return -1;
+    }
+  } else if(n < 0){
+    sz = uvmdealloc(p->pagetable, sz, sz + n);
+  }
+  // user page table changed, also change kernel page table
+  u2kvmcopy(p->pagetable, p->kpagetable, p->sz, sz);
+  p->sz = sz;
+  return 0;
+}
+```  
+
+- modify `userinit()` in `kernel/proc.c` to map user address space to kernel in the first user process 
+```cpp
+// Set up first user process.
+void
+userinit(void)
+{
+  struct proc *p;
+
+  p = allocproc();
+  initproc = p;
+  
+  // allocate one user page and copy init's instructions
+  // and data into it.
+  uvminit(p->pagetable, initcode, sizeof(initcode));
+  p->sz = PGSIZE;
+
+  u2kvmcopy(p->pagetable, p->kpagetable, 0, p->sz);
+
+  // prepare for the very first "return" from kernel to user.
+  p->trapframe->epc = 0;      // user program counter
+  p->trapframe->sp = PGSIZE;  // user stack pointer
+
+  safestrcpy(p->name, "initcode", sizeof(p->name));
+  p->cwd = namei("/");
+
+  p->state = RUNNABLE;
+
+  release(&p->lock);
+}
+```
+- modify `copyin() copyinstr()`, just use `copyin_new() copyinstr_new()`
+```cpp
+int
+copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
+{
+  return copyin_new(pagetable, dst, srcva, len);
+}
+
+int
+copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
+{
+  return copyinstr_new(pagetable, dst, srcva, max);
+}
+``` 
