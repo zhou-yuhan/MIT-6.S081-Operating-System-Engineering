@@ -299,23 +299,24 @@ void u2kvmcopy(pagetable_t upagetable, pagetable_t kpagetable, uint64 oldsz, uin
   np->cwd = idup(p->cwd);
 
   // copy parent user pagetable to child kernel page table
-  u2kvmcopy(p->pagetable, np->kpagetable, 0, p->sz);
+  u2kvmcopy(np->pagetable, np->kpagetable, 0, np->sz);
 
   safestrcpy(np->name, p->name, sizeof(p->name));
 
 // exec
-  // Allocate two pages at the next page boundary.
-  // Use the second as the user stack.
-  sz = PGROUNDUP(sz);
-  uint64 sz1;
-  if((sz1 = uvmalloc(pagetable, sz, sz + 2*PGSIZE)) == 0)
-    goto bad;
-  sz = sz1;
-  uvmclear(pagetable, sz-2*PGSIZE);
-  sp = sz;
-  stackbase = sp - PGSIZE;
+  // Commit to the user image.
+  oldpagetable = p->pagetable;
+  p->pagetable = pagetable;
+  p->sz = sz;
+  p->trapframe->epc = elf.entry;  // initial program counter = main
+  p->trapframe->sp = sp; // initial stack pointer
+  proc_freepagetable(oldpagetable, oldsz);
 
-  u2kvmcopy(pagetable, p->kpagetable, 0, sz);
+  u2kvmcopy(p->pagetable, p->kpagetable, 0, sz);
+
+  if(p->pid == 1) 
+    vmprint(p->pagetable);
+  return argc; // this ends up in a0, the first argument to main(argc, argv)
 
 // growproc (sbrk)
 // Grow or shrink user memory by n bytes.
